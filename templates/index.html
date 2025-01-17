@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Choix du trajet</title>
+</head>
+<body>
+    <h1>Choix du Trajet</h1>
+    <form action="/show-route" method="POST">
+        <p>
+            <label for="start_lat">Latitude départ :</label><br/>
+            <input type="text" id="start_lat" name="start_lat" value="48.8566" />
+        </p>
+        <p>
+            <label for="start_lon">Longitude départ :</label><br/>
+            <input type="text" id="start_lon" name="start_lon" value="2.3522" />
+        </p>
+        <p>
+            <label for="end_lat">Latitude arrivée :</label><br/>
+            <input type="text" id="end_lat" name="end_lat" value="48.8584" />
+        </p>
+        <p>
+            <label for="end_lon">Longitude arrivée :</label><br/>
+            <input type="text" id="end_lon" name="end_lon" value="2.2945" />
+        </p>
+        <button type="submit">Tracer le trajet</button>
+    </form>
+</body>
+</html>

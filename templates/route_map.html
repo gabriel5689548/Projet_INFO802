@@ -1,24 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8" />
+    <meta charset="utf-8">
     <title>Itinéraire</title>
 </head>
 <body>
-    <h1>Itinéraire tracé</h1>
+    <h1>Itinéraire de {{ start_city }} à {{ end_city }}</h1>
 
-    <!-- Vous pouvez afficher les coordonnées si besoin -->
-    <p>
-      Départ : {{ start_lat }}, {{ start_lon }} <br/>
-      Arrivée : {{ end_lat }}, {{ end_lon }}
-    </p>
-
-    <!-- Ici on injecte le HTML généré par Folium -->
     <div>
         {{ map_html|safe }}
     </div>
 
-    <!-- Lien pour revenir en arrière -->
     <p>
         <a href="/">Revenir</a>
     </p>

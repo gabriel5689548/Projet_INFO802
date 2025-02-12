@@ -1,10 +1,251 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Title</title>
+  <meta charset="UTF-8">
+  <title>Planification Trajet</title>
+  <!-- Lien Bootstrap -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+
+  <style>
+    /* Hauteur pleine page pour le container principal */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    #main-container {
+      height: 100%;
+      display: flex;
+      flex-direction: row;
+    }
+
+    /* --- Barre latérale (gauche) --- */
+    #sidebar {
+      width: 300px;
+      min-width: 300px;
+      background: linear-gradient(to bottom, #64b5f6, #1976d2);
+      color: #fff;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .car-title {
+      font-size: 1.2rem;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .car-image {
+      width: 100%;
+      border-radius: 10px;
+      margin-bottom: 15px;
+    }
+
+    .btn-arrow {
+      margin: 0 10px;
+      font-size: 1.2rem;
+    }
+
+    /* --- Panneau d'infos (distance, autonomie, etc.) --- */
+    .info-panel {
+      background-color: rgba(255, 255, 255, 0.1);
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+    .info-panel p {
+      margin: 5px 0;
+      font-weight: 500;
+    }
+
+    /* --- Zone de la carte --- */
+    #map-area {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* --- Bandeau du haut pour la sélection des villes --- */
+    #top-bar {
+      background-color: #ffffff;
+      padding: 10px 20px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 1000; /* au-dessus de la carte */
+    }
+    #top-bar .city-input {
+      max-width: 200px;
+    }
+    #top-bar .icon-bus {
+      width: 40px;
+      height: 40px;
+      margin-right: 10px;
+    }
+
+    /* --- La div qui contiendra la carte Folium --- */
+    #map-container {
+      flex: 1; /* occupe tout l’espace restant */
+      position: relative;
+      z-index: 0;
+    }
+    #map-container .folium-map {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
 </head>
 <body>
 
+<!--
+  Un seul formulaire englobant les villes + la voiture choisie
+  On lui donne un id="trip-form" pour le manipuler en JS
+-->
+<form action="/multi-step-route" method="POST" id="trip-form" style="height: 100%;">
+  <div id="main-container">
+    <!-- Barre latérale : choix de la voiture -->
+    <div id="sidebar">
+      <div>
+        <h3 class="text-center">Choix de la voiture</h3>
+
+        <div id="car-display" class="text-center mt-3">
+          <!-- Nom de la voiture + autonomie -->
+          <div class="car-title" id="car-name">
+            {% if selected_car %}
+              {{ selected_car.make }} {{ selected_car.carModel }} <br>
+              <small>Autonomie: {{ selected_car.battery.usable_kwh * 5 }} km</small>
+            {% endif %}
+          </div>
+
+          <!-- Image de la voiture -->
+          <img
+            src="{% if selected_car %}{{ selected_car.media.image.thumbnail_url | default('https://via.placeholder.com/300x200')}}{% else %}https://via.placeholder.com/300x200{% endif %}"
+            alt="Car image"
+            class="car-image"
+          >
+
+          <!-- Boutons gauche/droite pour naviguer entre voitures -->
+          <div class="d-flex justify-content-center">
+            <button type="button" class="btn btn-secondary btn-arrow">⬅️</button>
+            <button type="button" class="btn btn-secondary btn-arrow">➡️</button>
+          </div>
+
+          <!-- Bouton "Choisir" -->
+          <!-- type="button" pour éviter la soumission auto du formulaire -->
+          <button type="button" class="btn btn-light mt-3" id="choose-car-btn">
+            Choisir
+          </button>
+        </div>
+      </div>
+
+<div class="info-panel mt-4">
+  <p>Distance : {{ distance_km|round(1) }} km</p>
+  <p>Autonomie : {{ autonomy_km }} km</p>
+  <p>Charge : {{ charge_time_str }} </p>
+</div>
+
+      <div style="background-color: #3498db; color: #fff; padding: 10px; margin: 15px 0;">
+  {{ soap_result }}
+</div>
+    </div>
+
+    <!-- Zone principale : bandeau du haut (choix des villes), puis la carte -->
+    <div id="map-area">
+      <!-- Saisie des villes -->
+      <div id="top-bar">
+        <img src="https://cdn-icons-png.flaticon.com/512/201/201818.png"
+             alt="Bus icon" class="icon-bus">
+
+        <!-- Champ ville de départ -->
+        <input type="text" name="start_city" class="form-control city-input"
+               placeholder="Départ" value="{{ start_city if start_city else '' }}">
+
+        <!-- Champ ville d'arrivée -->
+        <input type="text" name="end_city" class="form-control city-input"
+               placeholder="Arrivée" value="{{ end_city if end_city else '' }}">
+
+        <!--
+          Champ caché pour stocker l'id de la voiture choisie.
+          On le remplit en JavaScript avant de soumettre le formulaire.
+        -->
+        <input type="hidden" name="car_id" id="car_id">
+      </div>
+
+      <!-- Contenu de la carte Folium -->
+      <div id="map-container">
+        {% if map_html %}
+          {{ map_html|safe }}
+        {% else %}
+          <p class="text-center mt-5">La carte s’affichera ici après le calcul d’itinéraire.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- Script pour gérer le slider des voitures -->
+<script>
+    // Récupère la liste des voitures envoyées par Flask et assure la compatibilité JSON
+    const cars = JSON.parse('{{ cars | tojson | safe }}');
+    const selectedCarId = "{{ selected_car.id if selected_car else '' }}";
+
+    // Sélecteurs dans le DOM
+    const carNameDiv = document.getElementById('car-name');
+    const carImage   = document.querySelector('.car-image');
+    const carIdInput = document.getElementById('car_id');
+
+    let currentIndex = 0;
+    if (selectedCarId) {
+      // On cherche la voiture correspondante dans "cars":
+      const idx = cars.findIndex(c => c.id === selectedCarId);
+      if (idx !== -1) {
+        currentIndex = idx;
+      }
+    }
+
+    // Fonction d'affichage
+    function displayCar(index) {
+        if (!cars.length) return;
+        const car = cars[index];
+
+        // Vérifications pour éviter les erreurs JSON mal formées
+        const make = car.make || "Marque inconnue";
+        const model = car.carModel || "Modèle inconnu";
+        const autonomy = car.battery?.usable_kwh ? car.battery.usable_kwh * 5 : "Inconnu";
+        const image = car.media?.image?.thumbnail_url || "https://via.placeholder.com/300x200";
+
+        // Mise à jour du contenu
+        carNameDiv.innerHTML = `${make} ${model} <br><small>Autonomie: ${autonomy} km</small>`;
+        carImage.src = image;
+        carImage.alt = `Image de ${make} ${model}`;
+    }
+
+    // Sélectionner une voiture et envoyer au formulaire
+    document.getElementById('choose-car-btn').addEventListener('click', () => {
+        const selectedCar = cars[currentIndex];
+        carIdInput.value = selectedCar.id;
+        console.log(carIdInput.value);
+        document.getElementById('trip-form').submit();
+    });
+
+    // Flèches de navigation entre les voitures
+    document.querySelectorAll('.btn-arrow').forEach((btn, i) => {
+        btn.addEventListener('click', () => {
+            currentIndex = (i === 0) ? (currentIndex - 1 + cars.length) % cars.length : (currentIndex + 1) % cars.length;
+            displayCar(currentIndex);
+        });
+    });
+
+    // Afficher la première voiture
+    displayCar(currentIndex);
+</script>
+
+
+<!-- Scripts Bootstrap -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

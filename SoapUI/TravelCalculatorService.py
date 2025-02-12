@@ -1,4 +1,3 @@
-# travel_service.py
 from spyne import Application, rpc, ServiceBase, Float, Integer, String
 from spyne.protocol.soap import Soap11
 from spyne.server.wsgi import WsgiApplication
@@ -11,20 +10,20 @@ class TravelCalculatorService(ServiceBase):
     """
 
     @rpc(
-        Float,    # distance (km)
-        Float,    # vitesse moyenne (km/h)
-        Float,    # autonomie (km)
-        Integer,  # temps de recharge (minutes) pour une recharge complète
-        Float,    # coût par km
+        Float,  # distance (km)
+        Float,  # vitesse moyenne (km/h)
+        Float,  # autonomie (km)
+        Float,  # temps de recharge (minutes) pour une recharge complète
+        Float,  # coût par km
         _returns=String
     )
     def calculate_trip(
-        ctx,
-        distance_km,
-        avg_speed_kmh,
-        autonomy_km,
-        charge_time_min,
-        cost_per_km
+            ctx,
+            distance_km,
+            avg_speed_kmh,
+            autonomy_km,
+            charge_time_min,
+            cost_per_km
     ):
         """
         Calcule et renvoie sous forme de texte le temps total et le coût du trajet.
@@ -36,41 +35,73 @@ class TravelCalculatorService(ServiceBase):
         cost_per_km : coût par km
         """
 
-        # 1) Calcul du temps de conduite
-        #    Temps de conduite = distance / vitesse
+        # 1) Temps de conduite total
         drive_time_h = distance_km / avg_speed_kmh  # en heures
 
-        # 2) Calcul du nombre de recharges nécessaires
-        #    Si l’autonomie est insuffisante pour la distance totale,
-        #    on estime combien de fois il faudra recharger.
+        # 2) Calcul du nombre « d’unités » d’autonomie utilisées
+        #    Exemple : si distance=800 km et autonomie=300 km,
+        #    full_segments = 2 (600 km), leftover_distance=200 km
+        full_segments = int(distance_km // autonomy_km)
+        leftover_distance = distance_km % autonomy_km
 
-        # Nombre de recharges nécessaires (entier)
-        distance_restante = max(0, distance_km - autonomy_km)
-        if distance_restante <= 0:
-            nb_recharges = 0  # Pas besoin de recharger
+        if full_segments == 0:
+            # Si la distance totale est inférieure ou égale à l’autonomie,
+            # aucun arrêt pour recharger.
+            nb_recharges = 0
+            total_charge_time_min = 0
         else:
-            nb_recharges = int((distance_restante - 1) // autonomy_km + 1)
+            # On sait qu’il faut au moins un (ou plusieurs) arrêts-recharge
+            # pour parcourir 'distance_km' en entier.
+            #
+            # - Le premier « segment » est couvert par la batterie déjà pleine au départ
+            # - Chaque segment d’autonomie complet suivant nécessite un arrêt
+            #   pour passer de 0% à 100%.
+            #
+            # Par contre, si leftover_distance > 0 (c’est-à-dire qu’on dépasse juste
+            # un multiple d’autonomie), on aura besoin d’une "recharge partielle"
+            # pour ce dernier tronçon.
+            #
+            # EXEMPLE :
+            #   * 800 km, autonomie=300 km
+            #   * full_segments = 2 (600 km), leftover=200
+            #   * => il y a 2 segments de 300 km + 1 segment de 200 km
+            #   *   => 2 arrêts recharge complets pour couvrir les 2 segments complets
+            #       + 1 recharge partielle (200/300) pour le leftover
 
-        # 3) Calcul du temps total de recharge
-        #    nb_recharges * charge_time_min (en minutes),
-        #    puis conversion en heures pour l’addition
-        total_charge_time_h = (nb_recharges * charge_time_min) / 60.0  # en heures
+            # Nombre de recharges "complètes"
+            # Si leftover_distance == 0, alors on n'a pas à recharger après le dernier segment.
+            if leftover_distance == 0:
+                # Exemple : 600 km, autonomie=300 => pile 2 segments
+                # => on a fait 2 segments mais le 2e segment se termine sur la destination,
+                #    donc on ne recharge pas "après" le 2e segment.
+                nb_recharges = full_segments - 1
+                partial_charge_time_min = 0
+            else:
+                # leftover_distance > 0 => on aura un tronçon partiel à couvrir
+                # => on compte 'full_segments' recharges complètes,
+                #    puis 1 recharge partielle pour finir.
+                nb_recharges = full_segments
+                # Temps de recharge partielle : proportionnel au ratio leftover/autonomy
+                partial_charge_ratio = leftover_distance / autonomy_km
+                partial_charge_time_min = partial_charge_ratio * charge_time_min
 
-        # 4) Temps total (heures)
+            # Temps de recharge total = (nombre de recharges complètes + recharge partielle)
+            total_charge_time_min = nb_recharges * charge_time_min + partial_charge_time_min
+
+        # 3) Conversion du temps de recharge (min -> h) et addition
+        total_charge_time_h = total_charge_time_min / 60.0
         total_time_h = drive_time_h + total_charge_time_h
 
-        # 5) Calcul du coût total
+        # 4) Calcul du coût total
         total_cost = distance_km * cost_per_km
 
-        # 6) Mise en forme de la réponse
-        #    On formate les heures/minutes pour être plus lisible
+        # 5) Mise en forme (H:MM)
         hours = int(total_time_h)
-        minutes = int((total_time_h - hours) * 60)
+        minutes = int(round((total_time_h - hours) * 60))
 
         result_str = (
             f"Temps total: {hours}h{minutes:02d}, "
             f"Coût: {total_cost:.2f} € "
-            f"(Nombre de recharges: {nb_recharges})."
         )
         return result_str
 

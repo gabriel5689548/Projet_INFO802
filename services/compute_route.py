@@ -192,6 +192,7 @@ def compute_route_data(start_city, end_city, car_id):
 
     return {
         "error": None,
+        "cars": cars,
         "selected_car": selected_car,
         "start_coords": start_coords,
         "end_coords": end_coords,

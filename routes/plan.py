@@ -3,6 +3,8 @@
 from flask import Blueprint, request, jsonify
 from flasgger import swag_from
 from services.compute_route import compute_route_data
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 plan_bp = Blueprint('plan_bp', __name__)
 
@@ -53,15 +55,18 @@ plan_bp = Blueprint('plan_bp', __name__)
                             'type': 'array',
                             'items': {'type': 'array', 'items': {'type': 'number'}}
                         }
-                    },
-                    'soap_result_str': {'type': 'string', 'example': 'Temps total: 4h45, Coût: 31.25€'}
+                    }
                 }
             }
         }
     }
 })
 def plan_route():
+    logging.debug("🔍 Requête reçue pour /plan-route")
+
+    
     data = request.get_json() or {}
+    logging.debug(f"📦 Données reçues: {data}")
     start_city = data.get('start_city')
     end_city   = data.get('end_city')
     car_id     = data.get('car_id')
@@ -70,10 +75,12 @@ def plan_route():
         return jsonify({"error": "Les paramètres start_city, end_city et car_id sont obligatoires"}), 400
 
     # Calcul complet de l'itinéraire
+    logging.debug("🔄 Appel à compute_route_data()")
     result = compute_route_data(start_city, end_city, car_id)
 
     if result.get("error"):
         return jsonify({"error": result["error"]}), 400
 
     # Retourne toutes les infos nécessaires pour l'API
+    logging.debug("✅ Réponse envoyée avec succès")
     return jsonify(result), 200

@@ -52,22 +52,6 @@ class SoapCalculatorService(ServiceBase):
         else:
             # On sait qu’il faut au moins un (ou plusieurs) arrêts-recharge
             # pour parcourir 'distance_km' en entier.
-            #
-            # - Le premier « segment » est couvert par la batterie déjà pleine au départ
-            # - Chaque segment d’autonomie complet suivant nécessite un arrêt
-            #   pour passer de 0% à 100%.
-            #
-            # Par contre, si leftover_distance > 0 (c’est-à-dire qu’on dépasse juste
-            # un multiple d’autonomie), on aura besoin d’une "recharge partielle"
-            # pour ce dernier tronçon.
-            #
-            # EXEMPLE :
-            #   * 800 km, autonomie=300 km
-            #   * full_segments = 2 (600 km), leftover=200
-            #   * => il y a 2 segments de 300 km + 1 segment de 200 km
-            #   *   => 2 arrêts recharge complets pour couvrir les 2 segments complets
-            #       + 1 recharge partielle (200/300) pour le leftover
-
             # Nombre de recharges "complètes"
             # Si leftover_distance == 0, alors on n'a pas à recharger après le dernier segment.
             if leftover_distance == 0:

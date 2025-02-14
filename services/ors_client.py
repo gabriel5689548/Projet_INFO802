@@ -2,7 +2,14 @@
 
 import openrouteservice as ors
 from openrouteservice import convert
-from config import ORS_API_KEY
+import os
+from dotenv import load_dotenv
+
+# Charger les variables d'environnement
+load_dotenv()
+
+# Récupérer la clé ORS
+ORS_API_KEY = os.getenv("ORS_API_KEY")
 
 def ors_directions(coord_start, coord_end):
     client = ors.Client(key=ORS_API_KEY)

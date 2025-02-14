@@ -6,6 +6,18 @@ from services.geocode import geocode_place
 from services.ors_client import ors_directions
 from services.soap import soap_calculate_trip
 from openrouteservice import convert
+import os
+from dotenv import load_dotenv
+
+# Charger les variables d'environnement
+load_dotenv()
+
+# Récupérer les clés API
+ORS_API_KEY = os.getenv("ORS_API_KEY")
+IRVE_API_URL = os.getenv("IRVE_API_URL")
+X_CLIENT_ID = os.getenv("X_CLIENT_ID")
+X_APP_ID = os.getenv("X_APP_ID")
+
 
 def haversine(lon1, lat1, lon2, lat2):
     R = 6371.0
@@ -22,8 +34,8 @@ def fetch_cars():
     # Exemple minimal
     API_URL = "https://api.chargetrip.io/graphql"
     HEADERS = {
-        "x-client-id": "678e43d96f014f34da844c42",
-        "x-app-id": "678e43d96f014f34da844c44",
+        "x-client-id": "X_CLIENT_ID",
+        "x-app-id": "X_APP_ID",
         "Content-Type": "application/json",
     }
     query = """
@@ -88,8 +100,8 @@ def compute_route_data(start_city, end_city, car_id):
     if not selected_car:
         return {"error": "Voiture introuvable"}
 
-    autonomy_km = selected_car['battery']['usable_kwh'] * 5
-    battery_kwh = selected_car['battery']['usable_kwh']
+    autonomy_km = selected_car['battery']['usable_kwh'] * 5 # Calcul de l'autonomie max (ex: 60 kWh * 5 = 300 km)
+    battery_kwh = selected_car['battery']['usable_kwh'] # Capacité totale de la batterie
 
     start_coords = geocode_place(start_city)
     end_coords   = geocode_place(end_city)
@@ -136,7 +148,7 @@ def compute_route_data(start_city, end_city, car_id):
                 c_lon, c_lat = coords_list[i]
                 seg_dist = haversine(last_pt[0], last_pt[1], c_lon, c_lat)
                 distance_acc += seg_dist
-                if distance_acc >= autonomy_km:
+                if distance_acc >= autonomy_km * 0.80:
                     autonomy_reached_index = i
                     break
                 last_pt = (c_lon, c_lat)
